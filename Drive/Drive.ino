@@ -1,10 +1,11 @@
-//
-// MME 4487 Lab 5 Drive
-//
+// 
+// MME 4487 project Code
+// 
 //  Language: Arduino (C++)
 //  Target:   ESP32
-//  Author:   Michael Naish
-//  Date:     2023 10 08
+//  Author: Tirth Patel
+//  Co-Author:   Michael Naish
+//  Date:     2023 11 25
 //
 
 #define SERIAL_STUDIO                                 // print formatted string, that can be captured and parsed by Serial-Studio
@@ -81,7 +82,7 @@ DriveDataPacket driveData;              // data packet to send controller
 
 // TCS34725 colour sensor with 2.4 ms integration time and gain of 4
 // see https://github.com/adafruit/Adafruit_TCS34725/blob/master/Adafruit_TCS34725.h for all possible values
-//Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_2_4MS, TCS34725_GAIN_4X);
+Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_2_4MS, TCS34725_GAIN_4X);
 bool tcsFlag = 0;  // TCS34725 flag: 1 = connected; 0 = not found
 
 // REPLACE WITH MAC ADDRESS OF YOUR CONTROLLER ESP32
@@ -137,14 +138,14 @@ void setup() {
   }
 
   // Connect to TCS34725 colour sensor
- /* if (tcs.begin()) {
+  if (tcs.begin()) {
     Serial.printf("Found TCS34725 colour sensor\n");
     tcsFlag = true;
     digitalWrite(cTCSLED, 1);  // turn on onboard LED
   } else {
     Serial.printf("No TCS34725 found ... check your connections\n");
     tcsFlag = false;
-  }*/
+  }
 }
 
 void loop() {
@@ -182,7 +183,7 @@ void loop() {
     deltaT = ((float)(curTime - lastTime)) / 1.0e6;  // compute actual time interval in seconds
     lastTime = curTime;                              // update start time for next control cycle
     driveData.time = curTime;                        // update transmission time
-/*
+
     uint16_t r, g, b, c;               // RGBC values from TCS34725
     if (tcsFlag) {                     // if colour sensor initialized
       tcs.getRawData(&r, &g, &b, &c);  // get raw RGBC values
@@ -193,7 +194,7 @@ void loop() {
     } else { 
       driveData.detected = false;
     }
-    */
+    
     for (int k = 0; k < cNumMotors; k++) {
       velEncoder[k] = ((float)pos[k] - (float)lastEncoder[k]) / deltaT;  // calculate velocity in counts/sec
       lastEncoder[k] = pos[k];                                           // store encoder count for next control cycle
