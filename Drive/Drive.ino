@@ -1,6 +1,6 @@
-// 
+//
 // MME 4487 project Code
-// 
+//
 //  Language: Arduino (C++)
 //  Target:   ESP32
 //  Author: Tirth Patel
@@ -8,9 +8,10 @@
 //  Date:     2023 11 25
 //
 
-#define SERIAL_STUDIO                                 // print formatted string, that can be captured and parsed by Serial-Studio
-#define PRINT_SEND_STATUS                             // uncomment to turn on output packet send status
-#define PRINT_INCOMING  // uncomment to turn on output of incoming data
+#define SERIAL_STUDIO      // print formatted string, that can be captured and parsed by Serial-Studio
+#define PRINT_SEND_STATUS  // uncomment to turn on output packet send status
+#define PRINT_INCOMING     // uncomment to turn on output of incoming data
+#define PRINT_COLOUR       // uncomment to turn on output of colour sensor data
 
 #include <Arduino.h>
 #include <esp_now.h>
@@ -24,6 +25,7 @@ void setMotor(int dir, int pwm, int in1, int in2);
 void ARDUINO_ISR_ATTR encoderISR(void *arg);
 void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len);
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
+long degreesToDutyCycle(int deg);
 
 // Control data packet structure
 struct ControlDataPacket {
@@ -64,11 +66,26 @@ const int cMaxSpeedInCounts = 2500;       // maximum encoder counts/sec
 const int cMaxChange = 14;                // maximum increment in counts/cycle
 const int cMaxDroppedPackets = 20;        // maximum number of packets allowed to drop
 const float kp = 1.5;                     // proportional gain for PID
-const float ki = .2;                     // integral gain for PID
+const float ki = .2;                      // integral gain for PID
 const float kd = 0.3;                     // derivative gain for PID
 const int cTCSLED = 23;                   // GPIO pin for LED on TCS34725
+const int servoPin = 15;
+const int servoChannel = 5;
+
+/**
+    Calibration 
+      White background: R: 24 G:70 B:56 C: 176
+      Natural background: R:42  G:70 B:63 C: 176// R: 20 G: 24 B: 20
+      Black background: R: 23 G:33 B:28 C: 88
+  
+  */
+
+const int cali[] = { 27, 36, 31 };  // r g b
+const int tol = 2;
+const int actDelay = 1000;
 
 // Variables
+int servoAngle;
 unsigned long lastHeartbeat = 0;        // time of last heartbeat state change
 unsigned long lastTime = 0;             // last time of motor control was updated
 unsigned int commsLossCount = 0;        // number of sequential sent packets have dropped
@@ -76,9 +93,12 @@ Encoder encoder[] = { { 25, 26, 0 },    // encoder 0 on GPIO 25 and 26, 0 positi
                       { 32, 33, 0 } };  // encoder 1 on GPIO 32 and 33, 0 position
 long target[] = { 0, 0 };               // target encoder count for motor
 long lastEncoder[] = { 0, 0 };          // encoder count at last control cycle
-float targetF[] = { 0.0, 0.0 };         // target for motor as float
-ControlDataPacket inData;               // control data packet from controller
-DriveDataPacket driveData;              // data packet to send controller
+long lastActTime;
+float targetF[] = { 0.0, 0.0 };  // target for motor as float
+
+
+ControlDataPacket inData;   // control data packet from controller
+DriveDataPacket driveData;  // data packet to send controller
 
 // TCS34725 colour sensor with 2.4 ms integration time and gain of 4
 // see https://github.com/adafruit/Adafruit_TCS34725/blob/master/Adafruit_TCS34725.h for all possible values
@@ -86,7 +106,7 @@ Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_2_4MS, TCS347
 bool tcsFlag = 0;  // TCS34725 flag: 1 = connected; 0 = not found
 
 // REPLACE WITH MAC ADDRESS OF YOUR CONTROLLER ESP32
-uint8_t receiverMacAddress[] = { 0xE0, 0xE2, 0xE6, 0x0C, 0x3C, 0x9C };  // MAC address of controller 0x08, 0xD1, 0xF9, 0x98, 0x8A, 0x38   // 0xFC, 0xB4, 0xB7, 0x50, 0xCD, 0x4C 
+uint8_t receiverMacAddress[] = { 0xE0, 0xE2, 0xE6, 0x0C, 0x3C, 0x9C };  // MAC address of controller 0x08, 0xD1, 0xF9, 0x98, 0x8A, 0x38   // 0xFC, 0xB4, 0xB7, 0x50, 0xCD, 0x4C
 esp_now_peer_info_t peerInfo = {};                                      // ESP-NOW peer information
 
 void setup() {
@@ -99,6 +119,10 @@ void setup() {
   pinMode(cHeartbeatLED, OUTPUT);  // configure built-in LED for heartbeat
   pinMode(cStatusLED, OUTPUT);     // configure GPIO for communication status LED as output
   pinMode(cTCSLED, OUTPUT);        // configure GPIO for control of LED on TCS34725
+
+  //Servo
+  ledcAttachPin(servoPin, servoChannel);
+  ledcSetup(servoChannel, 50, 16);
 
   // setup motors with encoders
   for (int k = 0; k < cNumMotors; k++) {
@@ -163,7 +187,10 @@ void loop() {
   int dir[] = { 1, 1 };           // direction that motor should turn
   int speedV = 0;                 // var to hold speed value
 
+  uint16_t r, g, b, cor;  // RGBC values from TCS34725
+  double c;
 
+  unsigned long curMillis = millis();
 
   // if too many sequential packets have dropped, assume loss of controller, restart as safety measure
   if (commsLossCount > cMaxDroppedPackets) {
@@ -184,22 +211,35 @@ void loop() {
     lastTime = curTime;                              // update start time for next control cycle
     driveData.time = curTime;                        // update transmission time
 
-    uint16_t r, g, b, c;               // RGBC values from TCS34725
-    if (tcsFlag) {                     // if colour sensor initialized
-      tcs.getRawData(&r, &g, &b, &c);  // get raw RGBC values
+    uint16_t r, g, b, cor;               // RGBC values from TCS34725
+    if (tcsFlag) {                       // if colour sensor initialized
+      tcs.getRawData(&r, &g, &b, &cor);  // get raw RGBC values
+      c = cor;
+#ifdef PRINT_COLOUR
+
+      Serial.printf("R: %f, G: %f, B: %f, C %f, A %d\n", r / c * 100, g / c * 100, b / c * 100, c, servoAngle);
+#endif
     }
- 
-    if (r >= 30 && g <= 60 && b <= 60) {// for my finger
-      driveData.detected = true;
-    } else { 
-      driveData.detected = false;
+
+    if (r / c * 100 >= cali[0] - tol && r / c * 100 <= cali[0] + tol && g / c * 100 >= cali[1] - tol && g / c * 100 <= cali[1] + tol && b / c * 100 >= cali[2] - tol && b / c * 100 <= cali[2] + tol) {
+      //servoAngle = 180;
     }
-    
+
+    servoAngle = 180; 
+    if ((curMillis - lastActTime) > actDelay) {
+      lastActTime = curMillis;
+      ledcWrite(servoChannel, degreesToDutyCycle(servoAngle));
+      Serial.println("done");
+      servoAngle = 90;
+    }
+
+
+
     for (int k = 0; k < cNumMotors; k++) {
       velEncoder[k] = ((float)pos[k] - (float)lastEncoder[k]) / deltaT;  // calculate velocity in counts/sec
       lastEncoder[k] = pos[k];                                           // store encoder count for next control cycle
       velMotor[k] = velEncoder[k] / cCountsRev * 60;                     // calculate motor shaft velocity in rpm
-      inData.speed*=.3; // lower speed because too big of jump
+      inData.speed *= .3;                                                // lower speed because too big of jump
       // update target for set direction
       posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
 
@@ -215,12 +255,12 @@ void loop() {
       }
 
       if (inData.dir == 0 && inData.turn != 0) {  // for turn in place
-        posChange[k] = (float)(inData.speed); // set both to got forward
+        posChange[k] = (float)(inData.speed);     // set both to got forward
         if (inData.turn == 1) {                   // to turn left
-          posChange[0] *=-1;                         // Left goes backwards
-          
-        } else { // else turning right
-          posChange[1] *=-1; //right goes backwards
+          posChange[0] *= -1;                     // Left goes backwards
+
+        } else {               // else turning right
+          posChange[1] *= -1;  //right goes backwards
         }
       }
       // changes
@@ -266,7 +306,7 @@ void loop() {
         printf(",");  // data separator for Serial Studio parsing
       }
       if (k == cNumMotors - 1) {
-        printf(",%d,%d,%d*/\r\n",3,2,4);  // end of sequence for Serial Studio parsing
+        printf(",%d,%d,%d*/\r\n", 3, 2, 4);  // end of sequence for Serial Studio parsing
       }
 #endif
     }
@@ -278,6 +318,7 @@ void loop() {
       digitalWrite(cStatusLED, 1);  // turn on communication status LED
     }
   }
+  ledcWrite(servoChannel, degreesToDutyCycle(servoAngle));
   doHeartbeat();  // update heartbeat LED
 }
 
@@ -342,4 +383,22 @@ void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   } else {
     commsLossCount = 0;  // reset communication loss counter
   }
+}
+
+// Converts servo position in degrees into the required duty cycle for an RC servo motor control signal
+// assuming 16-bit resolution (i.e., value represented as fraction of 65535).
+// Note that the constants for minimum and maximum duty cycle may need to be adjusted for a specific motor
+
+long degreesToDutyCycle(int deg) {
+  const long cl_MinDutyCycle = 1650;  // duty cycle for 0 degrees
+  const long cl_MaxDutyCycle = 8175;  // duty cycle for 180 degrees
+
+  long l_DutyCycle = map(deg, 0, 180, cl_MinDutyCycle, cl_MaxDutyCycle);  // convert to duty cycle
+
+#ifdef OUTPUT_ON
+  float f_Percent = l_DutyCycle * 0.0015259;  // dutyCycle / 65535 * 100
+  Serial.printf("Degrees %d, Duty Cycle Val: %ld = %f%%\n", i_ServoPos, l_DutyCycle, f_Percent);
+#endif
+
+  return l_DutyCycle;
 }
