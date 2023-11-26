@@ -32,14 +32,13 @@ struct ControlDataPacket {
   int dir;             // drive direction: 1 = forward, -1 = reverse, 0 = stop
   int speed;           // pot input for speed
   int turn;            // turn 1 for L -1 for R 1
-  int conveyer;        
   unsigned long time;  // time packet sent
 };
 
 // Drive data packet structure
 struct DriveDataPacket {
   unsigned long time;  // time packet sent
-  //boolean detected;    // to turn led on
+  boolean detected;    // to turn led on
 };
 
 // Encoder structure
@@ -56,10 +55,8 @@ const int cHeartbeatInterval = 500;       // heartbeat blink interval, in millis
 const int cNumMotors = 2;                 // Number of DC motors
 const int cIN1Pin[] = { 17, 19 };         // GPIO pin(s) for INT1
 const int cIN1Chan[] = { 0, 1 };          // PWM channe(s) for INT1
-const int cIN2Pin[] = { 16, 18 };        // GPIO pin(s) for INT2
+const int c2IN2Pin[] = { 16, 18 };        // GPIO pin(s) for INT2
 const int cIN2Chan[] = { 2, 3 };          // PWM channel(s) for INT2
-const int cIN3Pin[] = {32,33};            //GPIO pin(s) for INT3
-const int cIN3Chan[] = {4 , 5 };           // GPIO pin(s) for INT 3 
 const int cPWMRes = 8;                    // bit resolution for PWM
 const int cMinPWM = 0;                    // PWM value for minimum speed that turns motor
 const int cMaxPWM = pow(2, cPWMRes) - 1;  // PWM value for maximum speed
@@ -72,13 +69,8 @@ const float kp = 1.5;                     // proportional gain for PID
 const float ki = .2;                      // integral gain for PID
 const float kd = 0.3;                     // derivative gain for PID
 const int cTCSLED = 23;                   // GPIO pin for LED on TCS34725
-const int servo1Pin = 14;                 // GPIO pin for servo1
-const int servo1Channel = 5;              //
-const int servo2Pin = 12;                   //
-const int servo2Channel = 4;              //GPIO pin for servo2
-const int servo3Pin = 13;                 //GPIO pin for servo3
-const int servo3Channel = 3; 
-
+const int servoPin = 15;
+const int servoChannel = 5;
 
 /**
     Calibration 
@@ -88,25 +80,22 @@ const int servo3Channel = 3;
   
   */
 
-const int cali[2][3] = {{27, 36, 31 }, {0,0,0}};  // r g b
+const int cali[] = { 27, 36, 31 };  // r g b
 const int tol = 2;
 const int actDelay = 1000;
 
-
-// Variables 
-int servo1Angle;                     
-int servo2Angle;
-//int servo3Angle; 
+// Variables
+int servoAngle;
 unsigned long lastHeartbeat = 0;        // time of last heartbeat state change
 unsigned long lastTime = 0;             // last time of motor control was updated
 unsigned int commsLossCount = 0;        // number of sequential sent packets have dropped
 Encoder encoder[] = { { 25, 26, 0 },    // encoder 0 on GPIO 25 and 26, 0 position
-                      { 34, 35, 0 },
-                      { 36, 39, 0 } };  // encoder 1 on GPIO 32 and 33, 0 position
-long target[] = { 0, 0, 0 };               // target encoder count for motor
-long lastEncoder[] = { 0, 0, 0 };          // encoder count at last control cycle
-float targetF[] = { 0.0, 0.0, 0.0 };  // target for motor as float
+                      { 32, 33, 0 } };  // encoder 1 on GPIO 32 and 33, 0 position
+long target[] = { 0, 0 };               // target encoder count for motor
+long lastEncoder[] = { 0, 0 };          // encoder count at last control cycle
 long lastActTime;
+float targetF[] = { 0.0, 0.0 };  // target for motor as float
+
 
 ControlDataPacket inData;   // control data packet from controller
 DriveDataPacket driveData;  // data packet to send controller
@@ -132,22 +121,14 @@ void setup() {
   pinMode(cTCSLED, OUTPUT);        // configure GPIO for control of LED on TCS34725
 
   //Servo
-  ledcAttachPin(servo1Pin, servo1Channel);
-  ledcSetup(servo1Channel, 50, 16);
-
-  ledcAttachPin(servo2Pin, servo2Channel);
-  ledcSetup(servo2Channel, 50, 16);
-
-  ledcAttachPin(servo3Pin, servo3Channel);
-  ledcSetup(servo3Channel, 50, 16);
-
-
+  ledcAttachPin(servoPin, servoChannel);
+  ledcSetup(servoChannel, 50, 16);
 
   // setup motors with encoders
   for (int k = 0; k < cNumMotors; k++) {
     ledcAttachPin(cIN1Pin[k], cIN1Chan[k]);     // attach INT1 GPIO to PWM channel
     ledcSetup(cIN1Chan[k], cPWMFreq, cPWMRes);  // configure PWM channel frequency and resolution
-    ledcAttachPin(cIN2Pin[k], cIN2Chan[k]);    // attach INT2 GPIO to PWM channel
+    ledcAttachPin(c2IN2Pin[k], cIN2Chan[k]);    // attach INT2 GPIO to PWM channel
     ledcSetup(cIN2Chan[k], cPWMFreq, cPWMRes);  // configure PWM channel frequency and resolution
     pinMode(encoder[k].chanA, INPUT);           // configure GPIO for encoder channel A input
     pinMode(encoder[k].chanB, INPUT);           // configure GPIO for encoder channel B input
@@ -193,23 +174,23 @@ void setup() {
 
 void loop() {
   float deltaT = 0;               // time interval
-  long pos[] = { 0, 0, 0 };          // current motor positions
-  float velEncoder[] = { 0, 0, 0 };  // motor velocity in counts/sec
-  float velMotor[] = { 0, 0, 0 };    // motor shaft velocity in rpm
-  float posChange[] = { 0, 0, 0 };   // change in position for set speed
-  long e[] = { 0, 0, 0 };            // position error
-  float ePrev[] = { 0, 0, 0  };       // previous position error
-  float dedt[] = { 0, 0, 0 };        // rate of change of position error (de/dt)
-  float eIntegral[] = { 0, 0, 0  };   // integral of error
-  float u[] = { 0, 0, 0 };           // PID control signal
-  int pwm[] = { 0, 0, 0 };           // motor speed(s), represented in bit resolution
-  int dir[] = { 1, 1, 1 };           // direction that motor should turn
+  long pos[] = { 0, 0 };          // current motor positions
+  float velEncoder[] = { 0, 0 };  // motor velocity in counts/sec
+  float velMotor[] = { 0, 0 };    // motor shaft velocity in rpm
+  float posChange[] = { 0, 0 };   // change in position for set speed
+  long e[] = { 0, 0 };            // position error
+  float ePrev[] = { 0, 0 };       // previous position error
+  float dedt[] = { 0, 0 };        // rate of change of position error (de/dt)
+  float eIntegral[] = { 0, 0 };   // integral of error
+  float u[] = { 0, 0 };           // PID control signal
+  int pwm[] = { 0, 0 };           // motor speed(s), represented in bit resolution
+  int dir[] = { 1, 1 };           // direction that motor should turn
   int speedV = 0;                 // var to hold speed value
 
   uint16_t r, g, b, cor;  // RGBC values from TCS34725
   double c;
 
-  
+  unsigned long curMillis = millis();
 
   // if too many sequential packets have dropped, assume loss of controller, restart as safety measure
   if (commsLossCount > cMaxDroppedPackets) {
@@ -236,25 +217,23 @@ void loop() {
       c = cor;
 #ifdef PRINT_COLOUR
 
-      Serial.printf("R: %f, G: %f, B: %f, C %f, A %d\n", r / c * 100, g / c * 100, b / c * 100, c, servo1Angle);
+      Serial.printf("R: %f, G: %f, B: %f, C %f, A %d\n", r / c * 100, g / c * 100, b / c * 100, c, servoAngle);
 #endif
     }
 
-    if (r / c * 100 >= cali[0][0] - tol && r / c * 100 <= cali[0][0] + tol && g / c * 100 >= cali[0][1] - tol && g / c * 100 <= cali[0][1] + tol && b / c * 100 >= cali[0][2] - tol && b / c * 100 <= cali[0][2] + tol) {
-      servo1Angle = 180;
-    }
-    if (r / c * 100 >= cali[1][0] - tol && r / c * 100 <= cali[1][0] + tol && g / c * 100 >= cali[1][1] - tol && g / c * 100 <= cali[1][1] + tol && b / c * 100 >= cali[1][2] - tol && b / c * 100 <= cali[1][2] + tol){
-      servo2Angle=90;
+    if (r / c * 100 >= cali[0] - tol && r / c * 100 <= cali[0] + tol && g / c * 100 >= cali[1] - tol && g / c * 100 <= cali[1] + tol && b / c * 100 >= cali[2] - tol && b / c * 100 <= cali[2] + tol) {
+      //servoAngle = 180;
     }
 
-    unsigned long curMillis = millis();
+    servoAngle = 180; 
     if ((curMillis - lastActTime) > actDelay) {
       lastActTime = curMillis;
-      ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));
-      ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
-      servo1Angle = 90;
-      servo2Angle = 180;
+      ledcWrite(servoChannel, degreesToDutyCycle(servoAngle));
+      Serial.println("done");
+      servoAngle = 90;
     }
+
+
 
     for (int k = 0; k < cNumMotors; k++) {
       velEncoder[k] = ((float)pos[k] - (float)lastEncoder[k]) / deltaT;  // calculate velocity in counts/sec
@@ -263,7 +242,7 @@ void loop() {
       inData.speed *= .3;                                                // lower speed because too big of jump
       // update target for set direction
       posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
-      posChange[2] = (float) (inData.speed* inData.conveyer); 
+
 
 
       if (inData.turn == 1 && inData.dir != 0) {  //to turn left
@@ -284,15 +263,13 @@ void loop() {
           posChange[1] *= -1;  //right goes backwards
         }
       }
-
-
       // changes
       targetF[k] = targetF[k] + posChange[k];  // set new target position
 
 
       if (k == 0) {                    // assume differential drive
         target[k] = (long)targetF[k];  // motor 1 spins one way
-      } else if(k==1){
+      } else {
         target[k] = (long)-targetF[k];  // motor 2 spins in opposite direction
       }
 
@@ -341,9 +318,7 @@ void loop() {
       digitalWrite(cStatusLED, 1);  // turn on communication status LED
     }
   }
-  ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));
-  ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
-  //ledcWrite(servo3Channel, degreesToDutyCycle(servo3Angle));
+  ledcWrite(servoChannel, degreesToDutyCycle(servoAngle));
   doHeartbeat();  // update heartbeat LED
 }
 
@@ -393,7 +368,7 @@ void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
   }
   memcpy(&inData, incomingData, sizeof(inData));  // store drive data from controller
 #ifdef PRINT_INCOMING
-  Serial.printf("%d, %d, %d, %d, %d\n", inData.dir, inData.time, inData.speed, inData.turn);
+  Serial.printf("%d, %d, %d, %d, %d\n", inData.dir, inData.time, inData.speed, inData.turn, driveData.detected);
 #endif
 }
 
