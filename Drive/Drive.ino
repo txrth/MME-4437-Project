@@ -74,9 +74,9 @@ const float kd = 0.3;                     // derivative gain for PID
 const int cTCSLED = 23;                   // GPIO pin for LED on TCS34725
 const int servo1Pin = 14;                 // GPIO pin for servo1
 const int servo1Channel = 5;              //
-const int servo2Pin = 12;                   //
+const int servo2Pin = 13;                   //
 const int servo2Channel = 4;              //GPIO pin for servo2
-const int servo3Pin = 13;                 //GPIO pin for servo3
+const int servo3Pin = 12;                 //GPIO pin for servo3
 const int servo3Channel = 3; 
 
 
@@ -88,8 +88,8 @@ const int servo3Channel = 3;
   
   */
 
-const int cali[2][3] = {{27, 36, 31 }, {0,0,0}};  // r g b
-const int tol = 2;
+const int cali[2][3] = {{28, 36, 29 }, {31,35,28}};  // r g b
+const int tol = 1;
 const int actDelay = 1000;
 
 
