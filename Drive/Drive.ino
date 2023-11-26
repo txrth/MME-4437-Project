@@ -8,9 +8,9 @@
 //  Date:     2023 11 25
 //
 
-#define SERIAL_STUDIO      // print formatted string, that can be captured and parsed by Serial-Studio
-#define PRINT_SEND_STATUS  // uncomment to turn on output packet send status
-#define PRINT_INCOMING     // uncomment to turn on output of incoming data
+//#define SERIAL_STUDIO      // print formatted string, that can be captured and parsed by Serial-Studio
+//#define PRINT_SEND_STATUS  // uncomment to turn on output packet send status
+//#define PRINT_INCOMING     // uncomment to turn on output of incoming data
 #define PRINT_COLOUR       // uncomment to turn on output of colour sensor data
 
 #include <Arduino.h>
@@ -94,7 +94,7 @@ const int actDelay = 1000;
 
 
 // Variables 
-int servo1Angle;                     
+int servo1Angle=0;                     
 int servo2Angle;
 //int servo3Angle; 
 unsigned long lastHeartbeat = 0;        // time of last heartbeat state change
@@ -213,8 +213,8 @@ void loop() {
 
   // if too many sequential packets have dropped, assume loss of controller, restart as safety measure
   if (commsLossCount > cMaxDroppedPackets) {
-    delay(1000);    // okay to block here as nothing else should be happening
-    ESP.restart();  // restart ESP32
+    //delay(1000);    // okay to block here as nothing else should be happening
+    //ESP.restart();  // restart ESP32
   }
 
   // store encoder positions to avoid conflicts with ISR updates
@@ -241,9 +241,9 @@ void loop() {
     }
 
     if (r / c * 100 >= cali[0][0] - tol && r / c * 100 <= cali[0][0] + tol && g / c * 100 >= cali[0][1] - tol && g / c * 100 <= cali[0][1] + tol && b / c * 100 >= cali[0][2] - tol && b / c * 100 <= cali[0][2] + tol) {
-      servo1Angle = 180;
-    }
-    if (r / c * 100 >= cali[1][0] - tol && r / c * 100 <= cali[1][0] + tol && g / c * 100 >= cali[1][1] - tol && g / c * 100 <= cali[1][1] + tol && b / c * 100 >= cali[1][2] - tol && b / c * 100 <= cali[1][2] + tol){
+      servo1Angle = 90;
+      ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));
+    }else if (r / c * 100 >= cali[1][0] - tol && r / c * 100 <= cali[1][0] + tol && g / c * 100 >= cali[1][1] - tol && g / c * 100 <= cali[1][1] + tol && b / c * 100 >= cali[1][2] - tol && b / c * 100 <= cali[1][2] + tol && c>=100){
       servo2Angle=90;
     }
 
@@ -252,8 +252,8 @@ void loop() {
       lastActTime = curMillis;
       ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));
       ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
-      servo1Angle = 90;
-      servo2Angle = 180;
+      servo1Angle = 0;
+      servo2Angle = 170;
     }
 
     for (int k = 0; k < cNumMotors; k++) {
@@ -341,7 +341,8 @@ void loop() {
       digitalWrite(cStatusLED, 1);  // turn on communication status LED
     }
   }
-  ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));
+ 
+ 
   ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
   //ledcWrite(servo3Channel, degreesToDutyCycle(servo3Angle));
   doHeartbeat();  // update heartbeat LED
