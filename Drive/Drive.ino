@@ -32,7 +32,7 @@ struct ControlDataPacket {
   int dir;             // drive direction: 1 = forward, -1 = reverse, 0 = stop
   int speed;           // pot input for speed
   int turn;            // turn 1 for L -1 for R 1
-  int conveyer;        
+  int conveyor;        
   unsigned long time;  // time packet sent
 };
 
@@ -117,7 +117,7 @@ Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_2_4MS, TCS347
 bool tcsFlag = 0;  // TCS34725 flag: 1 = connected; 0 = not found
 
 // REPLACE WITH MAC ADDRESS OF YOUR CONTROLLER ESP32
-uint8_t receiverMacAddress[] = { 0xE0, 0xE2, 0xE6, 0x0C, 0x3C, 0x9C };  // MAC address of controller 0x08, 0xD1, 0xF9, 0x98, 0x8A, 0x38   // 0xFC, 0xB4, 0xB7, 0x50, 0xCD, 0x4C
+uint8_t receiverMacAddress[] = { 0xB8, 0xD6, 0x1A, 0x68, 0x16, 0x0C};  // MAC address of controller 0x08, 0xD1, 0xF9, 0x98, 0x8A, 0x38   // 0xFC, 0xB4, 0xB7, 0x50, 0xCD, 0x4C
 esp_now_peer_info_t peerInfo = {};                                      // ESP-NOW peer information
 
 void setup() {
@@ -263,7 +263,7 @@ void loop() {
       inData.speed *= .3;                                                // lower speed because too big of jump
       // update target for set direction
       posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
-      posChange[2] = (float) (inData.speed* inData.conveyer); 
+      
 
 
       if (inData.turn == 1 && inData.dir != 0) {  //to turn left
@@ -285,7 +285,7 @@ void loop() {
         }
       }
 
-
+      posChange[2] = (float) (inData.speed* inData.conveyor); 
       // changes
       targetF[k] = targetF[k] + posChange[k];  // set new target position
 

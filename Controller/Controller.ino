@@ -37,14 +37,13 @@ struct ControlDataPacket {
   int dir;                                            // drive direction: 1 = forward, -1 = reverse, 0 = stop
   int speed;
   int turn;
+  int conveyor;
   unsigned long time;                                 // time packet sent
-
 };
 
 // Drive data packet structure
 struct DriveDataPacket {
   unsigned long time;                                 // time packet sent
-  boolean detected; 
 };
 
 // Constants
@@ -53,7 +52,6 @@ const int cHeartbeatInterval = 500;                   // heartbeat blink interva
 const int cStatusLED = 26;                            // GPIO pin of communication status LED
 const long cDebounceDelay = 20;                       // button debounce delay in milliseconds
 const int cMaxDroppedPackets = 20;                    // maximum number of packets allowed to drop
-const int led1= 25;
 const int SPEED = 1600;
 
 
@@ -65,9 +63,12 @@ Button buttonFwd = {27, 0, 0, false, true, true};     // forward, NO pushbutton 
 Button buttonRev = {12, 0, 0, false, true, true};     // reverse, NO pushbutton on GPIO 12, low state when pressed
 Button buttonL = {13, 0, 0, false, true, true};     // L, NO pushbutton on GPIO 12, low state when pressed
 Button buttonR = {14, 0, 0, false, true, true};     // reverse, NO pushbutton on GPIO 12, low state when pressed
+Button buttonCovUp = {25, 0, 0, false, true, true}; 
+Button buttonCovDown = {26, 0, 0, false, true, true};  
+
 
 // REPLACE WITH MAC ADDRESS OF YOUR DRIVE ESP32
-uint8_t receiverMacAddress[] = {0x78,0xE3,0x6D, 0x65,0x32,0x6C};  // MAC address of drive 00:01:02:03:04:05 0xE0,0xE2,0xE6,0x0C,0x3C,0x9C
+uint8_t receiverMacAddress[] = {0xB0,0xA7,0x32, 0xF2,0x56,0x3C};  // MAC address of drive 00:01:02:03:04:05 0xE0,0xE2,0xE6,0x0C,0x3C,0x9C 0x78,0xE3,0x6D, 0x65,0x32,0x6C
 esp_now_peer_info_t peerInfo = {};                    // ESP-NOW peer information
 ControlDataPacket controlData;                        // data packet to send to drive system
 DriveDataPacket inData;                               // data packet from drive system
@@ -80,7 +81,6 @@ void setup() {
   WiFi.disconnect();                                  // disconnect from network
   
   // Configure GPIO
-  pinMode(led1,OUTPUT);
   pinMode(cHeartbeatLED, OUTPUT);                     // configure built-in LED for heartbeat as output
   pinMode(cStatusLED, OUTPUT);                        // configure GPIO for communication status LED as output
   pinMode(buttonFwd.pin, INPUT_PULLUP);               // configure GPIO for forward button pin as an input with pullup resistor
@@ -144,12 +144,6 @@ void loop() {
       controlData.dir = 0;
     }
 
-digitalWrite(led1,LOW);
-    if(inData.detected){
-      digitalWrite(led1,HIGH);
-      printf("led ON");
-    }
-
 
     if (!buttonL.state) {                           // forward pushbutton pressed
 
@@ -160,6 +154,14 @@ digitalWrite(led1,LOW);
     
     }else{
       controlData.turn=0;
+    }
+
+    if(!buttonCovUp.state){
+      controlData.conveyor=1;
+    }else if(!buttonCovDown.state){
+      controlData.conveyor=-1;
+    }else{
+      controlData.conveyor=0;
     }
     // if drive appears disconnected, update control signal to stop before sending
     if (commsLossCount > cMaxDroppedPackets) {
