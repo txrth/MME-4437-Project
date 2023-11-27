@@ -54,9 +54,9 @@ const int cHeartbeatLED = 2;              // GPIO pin of built-in LED for heartb
 const int cStatusLED = 27;                // GPIO pin of communication status LED
 const int cHeartbeatInterval = 500;       // heartbeat blink interval, in milliseconds
 const int cNumMotors = 3;                 // Number of DC motors
-const int cIN1Pin[] = { 17, 19, 32 };     // GPIO pin(s) for INT1
+const int cIN1Pin[] = { 17, 19, 33 };     // GPIO pin(s) for INT1 
 const int cIN1Chan[] = { 0, 1, 2 };       // PWM channe(s) for INT1
-const int cIN2Pin[] = { 16, 18, 33 };     // GPIO pin(s) for INT2
+const int cIN2Pin[] = { 16, 18, 32 };     // GPIO pin(s) for INT2
 const int cIN2Chan[] = { 3, 4, 5 };       // PWM channel(s) for INT2
 const int cPWMRes = 8;                    // bit resolution for PWM
 const int cMinPWM = 0;                    // PWM value for minimum speed that turns motor
@@ -66,18 +66,18 @@ const int cCountsRev = 1096;              // encoder pulses per motor revolution
 const int cMaxSpeedInCounts = 2500;       // maximum encoder counts/sec
 const int cMaxChange = 14;                // maximum increment in counts/cycle
 const int cMaxDroppedPackets = 20;        // maximum number of packets allowed to drop
-const float kp = 1.5;                     // proportional gain for PID
-const float ki = .2;                      // integral gain for PID
-const float kd = 0.3;                     // derivative gain for PID
+const float kp = 1; //1.5                    // proportional gain for PID
+const float ki = .4; //.2                     // integral gain for PID
+const float kd = .3; //.3                    // derivative gain for PID
 const int cTCSLED = 23;                   // GPIO pin for LED on TCS34725
 const int servo1Pin = 14;                 // GPIO pin for servo1
-const int servo1Channel = 5;              //
+const int servo1Channel = 6;              //
 const int servo2Pin = 13;                 //
-const int servo2Channel = 4;              //GPIO pin for servo2
+const int servo2Channel = 7;              //GPIO pin for servo2
 const int servo3Pin = 27;                 //GPIO pin for servo3
-const int servo3Channel = 3;
+const int servo3Channel = 8;
 const int servo4Pin = 4;
-const int servo4Channel = 2;
+const int servo4Channel = 9;
 
 
 /**
@@ -96,13 +96,14 @@ const int actDelay = 1000;
 // Variables
 int servo1Angle = 0;
 int servo2Angle;
-//int servo3Angle;
+int servo3Angle;
+int servo4Angle;
 unsigned long lastHeartbeat = 0;      // time of last heartbeat state change
 unsigned long lastTime = 0;           // last time of motor control was updated
 unsigned int commsLossCount = 0;      // number of sequential sent packets have dropped
 Encoder encoder[] = { { 26, 25, 0 },  // encoder 0 on GPIO 25 and 26, 0 position
                       { 35, 34, 0 },
-                      { 36, 39, 0 } };  // encoder 1 on GPIO 32 and 33, 0 position
+                      { 36, 39, 0 }};  // encoder 1 on GPIO 32 and 33, 0 position
 long target[] = { 0, 0, 0 };            // target encoder count for motor
 long lastEncoder[] = { 0, 0, 0 };       // encoder count at last control cycle
 float targetF[] = { 0.0, 0.0, 0.0 };    // target for motor as float
@@ -140,6 +141,9 @@ void setup() {
 
   ledcAttachPin(servo3Pin, servo3Channel);
   ledcSetup(servo3Channel, 50, 16);
+
+  ledcAttachPin(servo4Pin, servo4Channel);
+  ledcSetup(servo2Channel, 50,16);
 
 
 
@@ -217,12 +221,7 @@ void loop() {
     // ESP.restart();  // restart ESP32
   }
 
-  // store encoder positions to avoid conflicts with ISR updates
-  noInterrupts();  // disable interrupts temporarily while reading
-  for (int k = 0; k < cNumMotors; k++) {
-    pos[k] = encoder[k].pos;  // read and store current motor position
-  }
-  interrupts();  // turn interrupts back on
+
 
   unsigned long curTime = micros();                  // capture current time in microseconds
   if (curTime - lastTime > 10000) {                  // wait ~10 ms
@@ -239,43 +238,59 @@ void loop() {
       Serial.printf("R: %f, G: %f, B: %f, C %f, A %d\n", r / c * 100, g / c * 100, b / c * 100, c, servo2Angle);
 #endif
     }
+  }
 
-    if (c >= 70) {                                                                                                                                                                                         // object detected
-      if (r / c * 100 >= cali[0] - tol && r / c * 100 <= cali[0] + tol && g / c * 100 >= cali[1] - tol && g / c * 100 <= cali[1] + tol && b / c * 100 >= cali[2] - tol && b / c * 100 <= cali[2] + tol) {  // object is green gem
-        servo1Angle = 90;
-        ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));  // open
-        lastActTime = millis();
-      } else {
-        servo2Angle = 170;
-        lastActTime = millis();
-      }
+  if (c >= 70) {                                                                                                                                                                                         // object detected
+    if (r / c * 100 >= cali[0] - tol && r / c * 100 <= cali[0] + tol && g / c * 100 >= cali[1] - tol && g / c * 100 <= cali[1] + tol && b / c * 100 >= cali[2] - tol && b / c * 100 <= cali[2] + tol) {  // object is green gem
+      servo1Angle = 90;
+      ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));  // open
+      lastActTime = millis();
+    } else {
+      servo2Angle = 170;
+      lastActTime = millis();
     }
+  }
 
-    unsigned long curMillis = millis();
-    if ((curMillis - lastActTime) > actDelay) {
-      lastActTime = curMillis;
-      ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));
-      ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
-      servo1Angle = 0;
-      servo2Angle = 90;
-    }
+  unsigned long curMillis = millis();
+  if ((curMillis - lastActTime) > actDelay) {
+    lastActTime = curMillis;
+    ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));
+    ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
+    servo1Angle = 0;
+    servo2Angle = 90;
+    servo3Angle = 0;
+    servo4Angle = 0; 
+  }
+  // store encoder positions to avoid conflicts with ISR updates
+  noInterrupts();  // disable interrupts temporarily while reading
+  for (int k = 0; k < cNumMotors; k++) {
+    pos[k] = encoder[k].pos;  // read and store current motor position
+  }
+  interrupts();                        // turn interrupts back on
 
+  curTime = micros();
+  //if (curTime - lastTime > 10000) {                  // wait ~10 ms
+    deltaT = ((float)(curTime - lastTime)) / 1.0e6;  // compute actual time interval in seconds
+    lastTime = curTime;                              // update start time for next control cycle
     for (int k = 0; k < cNumMotors; k++) {
-      inData.speed = 100;
+      inData.speed = 50;
       velEncoder[k] = ((float)pos[k] - (float)lastEncoder[k]) / deltaT;  // calculate velocity in counts/sec
       lastEncoder[k] = pos[k];                                           // store encoder count for next control cycle
       velMotor[k] = velEncoder[k] / cCountsRev * 60;                     // calculate motor shaft velocity in rpm
-      //inData.speed *= .3;                                                // lower speed because too big of jump
+      //inData.speed = (int) (inData.speed/1600)*cMaxChange;                                                // lower speed because too big of jump
       // update target for set direction
+
+      // for Fwd and rev ONLY
       posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
 
+      //for turning
       if (inData.turn == 1 /*&& inData.dir != 0*/) {  //to turn left
         posChange[0] = 0;                             // set pos change to 0 for L motor
-                                                      // posChange[1] =  1 * inData.speed;
+        posChange[1] = 1 * inData.speed;              // posChange[1] =  1 * inData.speed;
 
       } else if (inData.turn == -1 /* && inData.dir != 0*/) {  //to turn right
         posChange[1] = 0;                                      // set pos change to 0 for R motor
-        //posChange[0] = 1 * inData.speed;
+        posChange[0] = 1 * inData.speed;
       }
       /*
       if (inData.dir == 0 && inData.turn != 0) {  // for turn in place
@@ -289,15 +304,18 @@ void loop() {
       }*/
 
       posChange[2] = (float)(inData.speed * inData.conveyor);
-
+      //Serial.println(posChange[2]); 
+      
       // changes
       targetF[k] = targetF[k] + posChange[k];  // set new target position
 
 
-      if (k == 0) {                    // assume differential drive
-        target[k] = (long)targetF[k];  // motor 1 spins one way
+      if (k == 0) {                    // assume differential drive //apperently forword is rev 
+        target[k] = (long)-targetF[k];  // motor 1 spins one way
       } else if (k == 1) {
-        target[k] = (long)-targetF[k];  // motor 2 spins in opposite direction
+        target[k] = (long)targetF[k];  // motor 2 spins in opposite direction
+      }else{
+        target[k]= (long)targetF[k]; //motor 3 spins too
       }
 
       // use PID to calculate control signal to motor
@@ -308,9 +326,9 @@ void loop() {
       ePrev[k] = e[k];                                      // store error for next control cycle
 
       // set direction based on computed control signal
-      dir[k] = 1;       // default to forward directon
-      if (u[k] == 1) {  // if control signal is negative
-        dir[k] = -1;    // set direction to reverse
+      dir[k] = 1;      // default to forward directon
+      if (u[k] < 0) {  // if control signal is negative
+        dir[k] = -1;   // set direction to reverse
       }
 
       // set speed based on computed control signal
@@ -318,8 +336,9 @@ void loop() {
       if (u[k] > cMaxSpeedInCounts) {  // if control signal will saturate motor
         u[k] = cMaxSpeedInCounts;      // impose upper limit
       }
+      //[k] = cMaxSpeedInCounts;                                     // impose upper limit
       pwm[k] = map(u[k], 0, cMaxSpeedInCounts, cMinPWM, cMaxPWM);  // convert control signal to pwm
-      if (/*commsLossCount < cMaxDroppedPackets / 4*/true) {
+      if (commsLossCount < cMaxDroppedPackets / 4) {
         setMotor(dir[k], pwm[k], cIN1Chan[k], cIN2Chan[k]);  // update motor speed and direction
       } else {
         setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);  // stop motor
@@ -333,18 +352,19 @@ void loop() {
         printf(",");  // data separator for Serial Studio parsing
       }
       if (k == cNumMotors - 1) {
-        printf(",%d,%d,%d*/\r\n", 3, 2, 4);  // end of sequence for Serial Studio parsing
+        printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle, servo3Angle);  // end of sequence for Serial Studio parsing
       }
 #endif
-    }
-    // send data from drive to controller
-    esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t *)&driveData, sizeof(driveData));
-    if (result == ESP_OK) {         // if sent successfully
-      digitalWrite(cStatusLED, 0);  // turn off communucation status LED
-    } else {                        // otherwise
-      digitalWrite(cStatusLED, 1);  // turn on communication status LED
-    }
+    //}
   }
+  // send data from drive to controller
+  esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t *)&driveData, sizeof(driveData));
+  if (result == ESP_OK) {         // if sent successfully
+    digitalWrite(cStatusLED, 0);  // turn off communucation status LED
+  } else {                        // otherwise
+    digitalWrite(cStatusLED, 1);  // turn on communication status LED
+  }
+
 
 
   //ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
