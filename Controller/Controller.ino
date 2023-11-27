@@ -52,7 +52,7 @@ const int cHeartbeatInterval = 500;                   // heartbeat blink interva
 const int cStatusLED = 26;                            // GPIO pin of communication status LED
 const long cDebounceDelay = 20;                       // button debounce delay in milliseconds
 const int cMaxDroppedPackets = 20;                    // maximum number of packets allowed to drop
-const int SPEED = 1600;
+const int SPEED = 600;
 
 
 // Variables
@@ -83,6 +83,7 @@ void setup() {
   // Configure GPIO
   pinMode(cHeartbeatLED, OUTPUT);                     // configure built-in LED for heartbeat as output
   pinMode(cStatusLED, OUTPUT);                        // configure GPIO for communication status LED as output
+  
   pinMode(buttonFwd.pin, INPUT_PULLUP);               // configure GPIO for forward button pin as an input with pullup resistor
   attachInterruptArg(buttonFwd.pin, buttonISR, &buttonFwd, CHANGE); // Configure forward pushbutton ISR to trigger on change
   pinMode(buttonRev.pin, INPUT_PULLUP);               // configure GPIO for reverse button pin as an input with pullup resistor
@@ -92,6 +93,12 @@ void setup() {
   attachInterruptArg(buttonL.pin, buttonISR, &buttonL, CHANGE); // Configure forward pushbutton ISR to trigger on change
   pinMode(buttonR.pin, INPUT_PULLUP);               // configure GPIO for reverse button pin as an input with pullup resistor
   attachInterruptArg(buttonR.pin, buttonISR, &buttonR, CHANGE); // Configure reverse pushbutton ISR to trigger on change
+  pinMode(buttonCovUp.pin, INPUT_PULLUP);
+  attachInterruptArg(buttonCovUp.pin, buttonISR, &buttonCovUp, CHANGE);
+  pinMode(buttonCovDown.pin, INPUT_PULLUP);
+  attachInterruptArg(buttonCovDown.pin, buttonISR, &buttonCovDown, CHANGE);
+
+
 
   // Initialize ESP-NOW
   if (esp_now_init() != ESP_OK) 
@@ -108,7 +115,7 @@ void setup() {
   
   // Set drive info
   memcpy(peerInfo.peer_addr, receiverMacAddress, 6);  // set address of peer
-  peerInfo.channel = 1;                               // set peer channel 
+  peerInfo.channel = 0;                               // set peer channel 
   peerInfo.encrypt = false;                           // no encryption of data
   
   // Add drive as ESP-NOW peer        

@@ -1,0 +1,158 @@
+{
+    "frameEnd": "*/",
+    "frameStart": "/*",
+    "groups": [
+        {
+            "datasets": [
+                {
+                    "alarm": 2100,
+                    "fft": false,
+                    "fftSamples": 1024,
+                    "graph": false,
+                    "led": false,
+                    "log": false,
+                    "max": 1200,
+                    "min": -200,
+                    "title": "Target",
+                    "units": "",
+                    "value": "%1",
+                    "widget": ""
+                },
+                {
+                    "alarm": 1100,
+                    "fft": false,
+                    "fftSamples": 1024,
+                    "graph": false,
+                    "led": false,
+                    "log": false,
+                    "max": 1200,
+                    "min": -200,
+                    "title": "Actual",
+                    "units": "",
+                    "value": "%2",
+                    "widget": ""
+                }
+            ],
+            "title": "1",
+            "widget": "multiplot"
+        },
+        {
+            "datasets": [
+                {
+                    "alarm": 2100,
+                    "fft": false,
+                    "fftSamples": 1024,
+                    "graph": false,
+                    "led": false,
+                    "log": false,
+                    "max": 1200,
+                    "min": -200,
+                    "title": "Target",
+                    "units": "",
+                    "value": "%4",
+                    "widget": ""
+                },
+                {
+                    "alarm": 1100,
+                    "fft": false,
+                    "fftSamples": 1024,
+                    "graph": false,
+                    "led": false,
+                    "log": false,
+                    "max": 1200,
+                    "min": -200,
+                    "title": "Actual",
+                    "units": "",
+                    "value": "%5",
+                    "widget": ""
+                }
+            ],
+            "title": "2",
+            "widget": "multiplot"
+        },
+        {
+            "datasets": [
+                {
+                    "alarm": 2100,
+                    "fft": false,
+                    "fftSamples": 1024,
+                    "graph": false,
+                    "led": false,
+                    "log": false,
+                    "max": 1200,
+                    "min": -200,
+                    "title": "Target",
+                    "units": "",
+                    "value": "%7",
+                    "widget": ""
+                },
+                {
+                    "alarm": 1100,
+                    "fft": false,
+                    "fftSamples": 1024,
+                    "graph": false,
+                    "led": false,
+                    "log": false,
+                    "max": 1200,
+                    "min": -200,
+                    "title": "Actual",
+                    "units": "",
+                    "value": "%8",
+                    "widget": ""
+                }
+            ],
+            "title": "3",
+            "widget": "multiplot"
+        },
+        {
+            "datasets": [
+                {
+                    "alarm": 0,
+                    "fft": false,
+                    "fftSamples": 1024,
+                    "graph": false,
+                    "led": false,
+                    "log": false,
+                    "max": 1000,
+                    "min": -1000,
+                    "title": "1",
+                    "units": "",
+                    "value": "%3",
+                    "widget": "gauge"
+                },
+                {
+                    "alarm": 0,
+                    "fft": false,
+                    "fftSamples": 1024,
+                    "graph": false,
+                    "led": false,
+                    "log": false,
+                    "max": 1000,
+                    "min": -1000,
+                    "title": "2",
+                    "units": "",
+                    "value": "%6",
+                    "widget": "gauge"
+                },
+                {
+                    "alarm": 0,
+                    "fft": false,
+                    "fftSamples": 1024,
+                    "graph": false,
+                    "led": false,
+                    "log": false,
+                    "max": 1000,
+                    "min": -1000,
+                    "title": "3",
+                    "units": "",
+                    "value": "%9",
+                    "widget": "gauge"
+                }
+            ],
+            "title": "Error",
+            "widget": "multiplot"
+        }
+    ],
+    "separator": ",",
+    "title": "Brushed DC Motor Control"
+}
