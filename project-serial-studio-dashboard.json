@@ -49,7 +49,7 @@
                     "min": -200,
                     "title": "Target",
                     "units": "",
-                    "value": "%4",
+                    "value": "%5",
                     "widget": ""
                 },
                 {
@@ -63,7 +63,7 @@
                     "min": -200,
                     "title": "Actual",
                     "units": "",
-                    "value": "%5",
+                    "value": "%6",
                     "widget": ""
                 }
             ],
@@ -83,7 +83,7 @@
                     "min": -200,
                     "title": "Target",
                     "units": "",
-                    "value": "%7",
+                    "value": "%9",
                     "widget": ""
                 },
                 {
@@ -97,7 +97,7 @@
                     "min": -200,
                     "title": "Actual",
                     "units": "",
-                    "value": "%8",
+                    "value": "%10",
                     "widget": ""
                 }
             ],
@@ -131,7 +131,7 @@
                     "min": -1000,
                     "title": "2",
                     "units": "",
-                    "value": "%6",
+                    "value": "%7",
                     "widget": "gauge"
                 },
                 {
@@ -145,7 +145,7 @@
                     "min": -1000,
                     "title": "3",
                     "units": "",
-                    "value": "%9",
+                    "value": "%11",
                     "widget": "gauge"
                 }
             ],

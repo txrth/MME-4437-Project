@@ -8,9 +8,9 @@
 //  Date:     2023 11 25
 //
 
-#define SERIAL_STUDIO      // print formatted string, that can be captured and parsed by Serial-Studio
+#define SERIAL_STUDIO  // print formatted string, that can be captured and parsed by Serial-Studio
 //#define PRINT_SEND_STATUS  // uncomment to turn on output packet send status
-#define PRINT_INCOMING     // uncomment to turn on output of incoming data
+#define PRINT_INCOMING  // uncomment to turn on output of incoming data
 //#define PRINT_COLOUR  // uncomment to turn on output of colour sensor data
 
 #include <Arduino.h>
@@ -54,10 +54,10 @@ const int cHeartbeatLED = 2;              // GPIO pin of built-in LED for heartb
 const int cStatusLED = 27;                // GPIO pin of communication status LED
 const int cHeartbeatInterval = 500;       // heartbeat blink interval, in milliseconds
 const int cNumMotors = 3;                 // Number of DC motors
-const int cIN1Pin[] = { 17, 19, 32 };         // GPIO pin(s) for INT1
-const int cIN1Chan[] = { 0, 1, 2 };          // PWM channe(s) for INT1
-const int cIN2Pin[] = { 16, 18, 33 };         // GPIO pin(s) for INT2
-const int cIN2Chan[] = { 3, 4, 5 };          // PWM channel(s) for INT2
+const int cIN1Pin[] = { 17, 19, 32 };     // GPIO pin(s) for INT1
+const int cIN1Chan[] = { 0, 1, 2 };       // PWM channe(s) for INT1
+const int cIN2Pin[] = { 16, 18, 33 };     // GPIO pin(s) for INT2
+const int cIN2Chan[] = { 3, 4, 5 };       // PWM channel(s) for INT2
 const int cPWMRes = 8;                    // bit resolution for PWM
 const int cMinPWM = 0;                    // PWM value for minimum speed that turns motor
 const int cMaxPWM = pow(2, cPWMRes) - 1;  // PWM value for maximum speed
@@ -100,8 +100,8 @@ int servo2Angle;
 unsigned long lastHeartbeat = 0;      // time of last heartbeat state change
 unsigned long lastTime = 0;           // last time of motor control was updated
 unsigned int commsLossCount = 0;      // number of sequential sent packets have dropped
-Encoder encoder[] = { { 25, 26, 0 },  // encoder 0 on GPIO 25 and 26, 0 position
-                      { 34, 35, 0 },
+Encoder encoder[] = { { 26, 25, 0 },  // encoder 0 on GPIO 25 and 26, 0 position
+                      { 35, 34, 0 },
                       { 36, 39, 0 } };  // encoder 1 on GPIO 32 and 33, 0 position
 long target[] = { 0, 0, 0 };            // target encoder count for motor
 long lastEncoder[] = { 0, 0, 0 };       // encoder count at last control cycle
@@ -214,7 +214,7 @@ void loop() {
   // if too many sequential packets have dropped, assume loss of controller, restart as safety measure
   if (commsLossCount > cMaxDroppedPackets) {
     //delay(1000);    // okay to block here as nothing else should be happening
-   // ESP.restart();  // restart ESP32
+    // ESP.restart();  // restart ESP32
   }
 
   // store encoder positions to avoid conflicts with ISR updates
@@ -240,14 +240,12 @@ void loop() {
 #endif
     }
 
-    if (c >= 70) {  // object detected
-      if (r / c * 100 >= cali[0] - tol && r / c * 100 <= cali[0] + tol && 
-          g / c * 100 >= cali[1] - tol && g / c * 100 <= cali[1] + tol &&
-          b / c * 100 >= cali[2] - tol && b / c * 100 <= cali[2] + tol) { // object is green gem
+    if (c >= 70) {                                                                                                                                                                                         // object detected
+      if (r / c * 100 >= cali[0] - tol && r / c * 100 <= cali[0] + tol && g / c * 100 >= cali[1] - tol && g / c * 100 <= cali[1] + tol && b / c * 100 >= cali[2] - tol && b / c * 100 <= cali[2] + tol) {  // object is green gem
         servo1Angle = 90;
-        ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));// open
+        ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));  // open
         lastActTime = millis();
-      } else { 
+      } else {
         servo2Angle = 170;
         lastActTime = millis();
       }
@@ -263,24 +261,23 @@ void loop() {
     }
 
     for (int k = 0; k < cNumMotors; k++) {
+      inData.speed = 100;
       velEncoder[k] = ((float)pos[k] - (float)lastEncoder[k]) / deltaT;  // calculate velocity in counts/sec
       lastEncoder[k] = pos[k];                                           // store encoder count for next control cycle
       velMotor[k] = velEncoder[k] / cCountsRev * 60;                     // calculate motor shaft velocity in rpm
-      inData.speed *= .3;                                                // lower speed because too big of jump
+      //inData.speed *= .3;                                                // lower speed because too big of jump
       // update target for set direction
       posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
 
+      if (inData.turn == 1 /*&& inData.dir != 0*/) {  //to turn left
+        posChange[0] = 0;                             // set pos change to 0 for L motor
+                                                      // posChange[1] =  1 * inData.speed;
 
-
-      if (inData.turn == 1 && inData.dir != 0) {  //to turn left
-        posChange[0] = 0;                         // set pos change to 0 for L motor
-        // posChange[1] =  * inData.speed;
-
-      } else if (inData.turn == -1 && inData.dir != 0) {  //to turn right
-        posChange[1] = 0;                                 // set pos change to 0 for R motor
+      } else if (inData.turn == -1 /* && inData.dir != 0*/) {  //to turn right
+        posChange[1] = 0;                                      // set pos change to 0 for R motor
         //posChange[0] = 1 * inData.speed;
       }
-
+      /*
       if (inData.dir == 0 && inData.turn != 0) {  // for turn in place
         posChange[k] = (float)(inData.speed);     // set both to got forward
         if (inData.turn == 1) {                   // to turn left
@@ -289,9 +286,10 @@ void loop() {
         } else {               // else turning right
           posChange[1] *= -1;  //right goes backwards
         }
-      }
+      }*/
 
       posChange[2] = (float)(inData.speed * inData.conveyor);
+
       // changes
       targetF[k] = targetF[k] + posChange[k];  // set new target position
 
@@ -310,9 +308,9 @@ void loop() {
       ePrev[k] = e[k];                                      // store error for next control cycle
 
       // set direction based on computed control signal
-      dir[k] = 1;      // default to forward directon
-      if (u[k] < 0) {  // if control signal is negative
-        dir[k] = -1;   // set direction to reverse
+      dir[k] = 1;       // default to forward directon
+      if (u[k] == 1) {  // if control signal is negative
+        dir[k] = -1;    // set direction to reverse
       }
 
       // set speed based on computed control signal
@@ -321,7 +319,7 @@ void loop() {
         u[k] = cMaxSpeedInCounts;      // impose upper limit
       }
       pwm[k] = map(u[k], 0, cMaxSpeedInCounts, cMinPWM, cMaxPWM);  // convert control signal to pwm
-      if (commsLossCount < cMaxDroppedPackets / 4) {
+      if (/*commsLossCount < cMaxDroppedPackets / 4*/true) {
         setMotor(dir[k], pwm[k], cIN1Chan[k], cIN2Chan[k]);  // update motor speed and direction
       } else {
         setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);  // stop motor
