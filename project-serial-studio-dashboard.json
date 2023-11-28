@@ -193,7 +193,7 @@
                     "min": 0,
                     "title": "Servo3",
                     "units": "",
-                    "value": "%14",
+                    "value": "%15",
                     "widget": "gauge"
                 }
             ],

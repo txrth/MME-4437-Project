@@ -39,6 +39,7 @@ struct ControlDataPacket {
 // Drive data packet structure
 struct DriveDataPacket {
   unsigned long time;  // time packet sent
+  int data [15]; 
   //boolean detected;    // to turn led on
 };
 
@@ -210,6 +211,7 @@ void loop() {
   int dir[] = { 1, 1, 1 };           // direction that motor should turn
   int speedV = 0;                    // var to hold speed value
 
+
   uint16_t r, g, b, cor;  // RGBC values from TCS34725
   double c;
 
@@ -344,6 +346,7 @@ void loop() {
         setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);  // stop motor
       }
 #ifdef SERIAL_STUDIO
+      
       if (k == 0) {
         printf("/*");  // start of sequence for Serial Studio parsing
       }
@@ -353,9 +356,23 @@ void loop() {
       }
       if (k == cNumMotors - 1) {
         printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle, servo3Angle);  // end of sequence for Serial Studio parsing
+        driveData.data [0] = target[0];
+        driveData.data [1] = pos[0];
+        driveData.data [2] = e[0];
+        driveData.data [3] = (int) velMotor[1];
+        driveData.data [4] = target[1];
+        driveData.data [5] = pos[1];
+        driveData.data [6] = e[1];
+        driveData.data [7] = (int) velMotor[1];
+        driveData.data [8] = target[2];
+        driveData.data [9] = pos[2];
+        driveData.data [10] = e[2];
+        driveData.data [11] = (int) velMotor[2];
+        driveData.data [12] = servo1Angle;
+        driveData.data [13] = servo2Angle;
+        driveData.data [14] = servo3Angle;
       }
 #endif
-    //}
   }
   // send data from drive to controller
   esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t *)&driveData, sizeof(driveData));
