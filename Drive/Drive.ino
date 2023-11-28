@@ -32,15 +32,15 @@ struct ControlDataPacket {
   int dir;    // drive direction: 1 = forward, -1 = reverse, 0 = stop
   int speed;  // pot input for speed
   int turn;   // turn 1 for L -1 for R 1
-  int conveyor;
+
+  int dump;
   unsigned long time;  // time packet sent
 };
 
 // Drive data packet structure
 struct DriveDataPacket {
   unsigned long time;  // time packet sent
-  int data [15]; 
-  //boolean detected;    // to turn led on
+  int data [14]; 
 };
 
 // Encoder structure
@@ -75,18 +75,16 @@ const int servo1Pin = 14;                 // GPIO pin for servo1
 const int servo1Channel = 6;              //
 const int servo2Pin = 13;                 //
 const int servo2Channel = 7;              //GPIO pin for servo2
-const int servo3Pin = 27;                 //GPIO pin for servo3
-const int servo3Channel = 8;
-const int servo4Pin = 4;
-const int servo4Channel = 9;
+//const int servo3Pin = 27;                 //GPIO pin for servo3
+//const int servo3Channel = 8;
+//const int servo4Pin = 4;
+//const int servo4Channel = 9;
 
 
 /**
     Calibration 
-      White background: R: 24 G:70 B:56 C: 176
-      Natural background: R:42  G:70 B:63 C: 176// R: 20 G: 24 B: 20
-      Black background: R: 23 G:33 B:28 C: 88
-  
+        if c >70 == detection
+        if [rgb] ./c = 28,36,29 == green
   */
 
 const int cali[3] = { 28, 36, 29 };  // r g b
@@ -97,8 +95,8 @@ const int actDelay = 1000;
 // Variables
 int servo1Angle = 0;
 int servo2Angle;
-int servo3Angle;
-int servo4Angle;
+//int servo3Angle;
+//int servo4Angle;
 unsigned long lastHeartbeat = 0;      // time of last heartbeat state change
 unsigned long lastTime = 0;           // last time of motor control was updated
 unsigned int commsLossCount = 0;      // number of sequential sent packets have dropped
@@ -140,11 +138,11 @@ void setup() {
   ledcAttachPin(servo2Pin, servo2Channel);
   ledcSetup(servo2Channel, 50, 16);
 
-  ledcAttachPin(servo3Pin, servo3Channel);
-  ledcSetup(servo3Channel, 50, 16);
+  //ledcAttachPin(servo3Pin, servo3Channel);
+  //ledcSetup(servo3Channel, 50, 16);
 
-  ledcAttachPin(servo4Pin, servo4Channel);
-  ledcSetup(servo2Channel, 50,16);
+  //ledcAttachPin(servo4Pin, servo4Channel);
+  //ledcSetup(servo2Channel, 50,16);
 
 
 
@@ -247,21 +245,23 @@ void loop() {
       servo1Angle = 90;
       ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));  // open
       lastActTime = millis();
-    } else {
-      servo2Angle = 170;
-      lastActTime = millis();
     }
   }
+
+  if(inData.dump==1){
+    servo2Angle = 130;
+  }else if(inData.dump==0){
+    servo2Angle=0;
+  }
+  ledcWrite(servo2Channel,degreesToDutyCycle(servo2Angle));
 
   unsigned long curMillis = millis();
   if ((curMillis - lastActTime) > actDelay) {
     lastActTime = curMillis;
     ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));
-    ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
     servo1Angle = 0;
-    servo2Angle = 90;
-    servo3Angle = 0;
-    servo4Angle = 0; 
+    //servo2Angle = 0;
+   // servo4Angle = 0; 
   }
   // store encoder positions to avoid conflicts with ISR updates
   noInterrupts();  // disable interrupts temporarily while reading
@@ -280,7 +280,7 @@ void loop() {
       lastEncoder[k] = pos[k];                                           // store encoder count for next control cycle
       velMotor[k] = velEncoder[k] / cCountsRev * 60;                     // calculate motor shaft velocity in rpm
       //inData.speed = (int) (inData.speed/1600)*cMaxChange;                                                // lower speed because too big of jump
-      // update target for set direction
+      //update target for set direction
 
       // for Fwd and rev ONLY
       posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
@@ -294,7 +294,6 @@ void loop() {
         posChange[1] = 0;                                      // set pos change to 0 for R motor
         posChange[0] = 1 * inData.speed;
       }
-      /*
       if (inData.dir == 0 && inData.turn != 0) {  // for turn in place
         posChange[k] = (float)(inData.speed);     // set both to got forward
         if (inData.turn == 1) {                   // to turn left
@@ -303,10 +302,9 @@ void loop() {
         } else {               // else turning right
           posChange[1] *= -1;  //right goes backwards
         }
-      }*/
+      }
 
-      posChange[2] = (float)(inData.speed * inData.conveyor);
-      //Serial.println(posChange[2]); 
+      posChange[2] = (float)(inData.speed); 
       
       // changes
       targetF[k] = targetF[k] + posChange[k];  // set new target position
@@ -355,7 +353,7 @@ void loop() {
         printf(",");  // data separator for Serial Studio parsing
       }
       if (k == cNumMotors - 1) {
-        printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle, servo3Angle);  // end of sequence for Serial Studio parsing
+        printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle);  // end of sequence for Serial Studio parsing
         driveData.data [0] = target[0];
         driveData.data [1] = pos[0];
         driveData.data [2] = e[0];
@@ -370,7 +368,7 @@ void loop() {
         driveData.data [11] = (int) velMotor[2];
         driveData.data [12] = servo1Angle;
         driveData.data [13] = servo2Angle;
-        driveData.data [14] = servo3Angle;
+       // driveData.data [14] = servo3Angle;
       }
 #endif
   }
@@ -435,7 +433,7 @@ void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
   }
   memcpy(&inData, incomingData, sizeof(inData));  // store drive data from controller
 #ifdef PRINT_INCOMING
-  Serial.printf("%d, %d, %d, %d, %d, %d\n", inData.dir, inData.time, inData.speed, inData.turn, inData.conveyor);
+  Serial.printf("%d, %d, %d, %d, %d, %d\n", inData.dir, inData.time, inData.speed, inData.turn, inData.dump);
 #endif
 }
 

@@ -39,13 +39,14 @@ struct ControlDataPacket {
   int speed;
   int turn;
   int conveyor;
+  int dump;
   unsigned long time;  // time packet sent
 };
 
 // Drive data packet structure
 struct DriveDataPacket {
   unsigned long time;  // time packet sent
-  int data[15];
+  int data[14];
 };
 
 // Constants
@@ -65,8 +66,8 @@ Button buttonFwd = { 27, 0, 0, false, true, true };  // forward, NO pushbutton o
 Button buttonRev = { 12, 0, 0, false, true, true };  // reverse, NO pushbutton on GPIO 12, low state when pressed
 Button buttonL = { 13, 0, 0, false, true, true };    // L, NO pushbutton on GPIO 12, low state when pressed
 Button buttonR = { 14, 0, 0, false, true, true };    // reverse, NO pushbutton on GPIO 12, low state when pressed
-Button buttonCovUp = { 25, 0, 0, false, true, true };
-Button buttonCovDown = { 26, 0, 0, false, true, true };
+Button buttonDump = { 25, 0, 0, false, true, true };
+
 
 
 // REPLACE WITH MAC ADDRESS OF YOUR DRIVE ESP32
@@ -90,17 +91,12 @@ void setup() {
   attachInterruptArg(buttonFwd.pin, buttonISR, &buttonFwd, CHANGE);  // Configure forward pushbutton ISR to trigger on change
   pinMode(buttonRev.pin, INPUT_PULLUP);                              // configure GPIO for reverse button pin as an input with pullup resistor
   attachInterruptArg(buttonRev.pin, buttonISR, &buttonRev, CHANGE);  // Configure reverse pushbutton ISR to trigger on change
-
-  pinMode(buttonL.pin, INPUT_PULLUP);                            // configure GPIO for forward button pin as an input with pullup resistor
-  attachInterruptArg(buttonL.pin, buttonISR, &buttonL, CHANGE);  // Configure forward pushbutton ISR to trigger on change
-  pinMode(buttonR.pin, INPUT_PULLUP);                            // configure GPIO for reverse button pin as an input with pullup resistor
-  attachInterruptArg(buttonR.pin, buttonISR, &buttonR, CHANGE);  // Configure reverse pushbutton ISR to trigger on change
-  pinMode(buttonCovUp.pin, INPUT_PULLUP);
-  attachInterruptArg(buttonCovUp.pin, buttonISR, &buttonCovUp, CHANGE);
-  pinMode(buttonCovDown.pin, INPUT_PULLUP);
-  attachInterruptArg(buttonCovDown.pin, buttonISR, &buttonCovDown, CHANGE);
-
-
+  pinMode(buttonL.pin, INPUT_PULLUP);                                // configure GPIO for forward button pin as an input with pullup resistor
+  attachInterruptArg(buttonL.pin, buttonISR, &buttonL, CHANGE);      // Configure forward pushbutton ISR to trigger on change
+  pinMode(buttonR.pin, INPUT_PULLUP);                                // configure GPIO for reverse button pin as an input with pullup resistor
+  attachInterruptArg(buttonR.pin, buttonISR, &buttonR, CHANGE);      // Configure reverse pushbutton ISR to trigger on change
+  pinMode(buttonDump.pin, INPUT_PULLUP);
+  attachInterruptArg(buttonDump.pin, buttonISR, &buttonDump, CHANGE);
 
   // Initialize ESP-NOW
   if (esp_now_init() != ESP_OK) {
@@ -156,39 +152,37 @@ void loop() {
       controlData.turn = 0;
     }
 
-    if (!buttonCovUp.state) {
-      controlData.conveyor = 1;
-    } else if (!buttonCovDown.state) {
-      controlData.conveyor = -1;
+    if (!buttonDump.state) {
+      controlData.dump = 1;
     } else {
-      controlData.conveyor = 0;
-    }
-    // if drive appears disconnected, update control signal to stop before sending
-    if (commsLossCount > cMaxDroppedPackets) {
-      controlData.dir = 0;
-    }
-    controlData.speed = SPEED;
-    // send control signal to drive
-    result = esp_now_send(receiverMacAddress, (uint8_t *)&controlData, sizeof(controlData));
-    if (result == ESP_OK) {         // if sent successfully
-      digitalWrite(cStatusLED, 0);  // turn off communucation status LED
-    } else {                        // otherwise
-      digitalWrite(cStatusLED, 1);  // turn on communication status LED
-    }
-  }
-#ifdef SERIAL_STUDIO
-  Serial.print("/*");
-  for (int i = 0; i < 15; i++) {
-  Serial.printf(" %d", inData.data[i]);
-    if (i != 14) {
-      Serial.printf(",");
-    }
-  }
-  Serial.println("*/");
-#endif
-  doHeartbeat();  // update heartbeat LED
-}
+      controlData.dump = 0;
 
+      // if drive appears disconnected, update control signal to stop before sending
+      if (commsLossCount > cMaxDroppedPackets) {
+        controlData.dir = 0;
+      }
+      controlData.speed = SPEED;
+      // send control signal to drive
+      result = esp_now_send(receiverMacAddress, (uint8_t *)&controlData, sizeof(controlData));
+      if (result == ESP_OK) {         // if sent successfully
+        digitalWrite(cStatusLED, 0);  // turn off communucation status LED
+      } else {                        // otherwise
+        digitalWrite(cStatusLED, 1);  // turn on communication status LED
+      }
+    }
+#ifdef SERIAL_STUDIO
+    Serial.print("/*");
+    for (int i = 0; i < 15; i++) {
+      Serial.printf(" %d", inData.data[i]);
+      if (i != 14) {
+        Serial.printf(",");
+      }
+    }
+    Serial.println("*/");
+#endif
+    doHeartbeat();  // update heartbeat LED
+  }
+}
 // blink heartbeat LED
 void doHeartbeat() {
   unsigned long curMillis = millis();  // get the current time in milliseconds

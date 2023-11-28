@@ -181,20 +181,6 @@
                     "units": "",
                     "value": "%14",
                     "widget": "gauge"
-                },
-                {
-                    "alarm": 0,
-                    "fft": false,
-                    "fftSamples": 1024,
-                    "graph": false,
-                    "led": false,
-                    "log": false,
-                    "max": 180,
-                    "min": 0,
-                    "title": "Servo3",
-                    "units": "",
-                    "value": "%15",
-                    "widget": "gauge"
                 }
             ],
             "title": "Error",
