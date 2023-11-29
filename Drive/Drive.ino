@@ -32,7 +32,6 @@ struct ControlDataPacket {
   int dir;    // drive direction: 1 = forward, -1 = reverse, 0 = stop
   int speed;  // pot input for speed
   int turn;   // turn 1 for L -1 for R 1
-
   int dump;
   unsigned long time;  // time packet sent
 };
@@ -94,7 +93,7 @@ const int actDelay = 1000;
 
 // Variables
 int servo1Angle = 0;
-int servo2Angle;
+int servo2Angle=0;
 //int servo3Angle;
 //int servo4Angle;
 unsigned long lastHeartbeat = 0;      // time of last heartbeat state change
@@ -138,11 +137,6 @@ void setup() {
   ledcAttachPin(servo2Pin, servo2Channel);
   ledcSetup(servo2Channel, 50, 16);
 
-  //ledcAttachPin(servo3Pin, servo3Channel);
-  //ledcSetup(servo3Channel, 50, 16);
-
-  //ledcAttachPin(servo4Pin, servo4Channel);
-  //ledcSetup(servo2Channel, 50,16);
 
 
 
@@ -249,10 +243,13 @@ void loop() {
   }
 
   if(inData.dump==1){
+    //Serial.println("here");
     servo2Angle = 130;
-  }else if(inData.dump==0){
-    servo2Angle=0;
+  }else{
+    //Serial.println("there");
+    servo2Angle=10;
   }
+
   ledcWrite(servo2Channel,degreesToDutyCycle(servo2Angle));
 
   unsigned long curMillis = millis();
@@ -260,8 +257,6 @@ void loop() {
     lastActTime = curMillis;
     ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));
     servo1Angle = 0;
-    //servo2Angle = 0;
-   // servo4Angle = 0; 
   }
   // store encoder positions to avoid conflicts with ISR updates
   noInterrupts();  // disable interrupts temporarily while reading
@@ -279,8 +274,10 @@ void loop() {
       velEncoder[k] = ((float)pos[k] - (float)lastEncoder[k]) / deltaT;  // calculate velocity in counts/sec
       lastEncoder[k] = pos[k];                                           // store encoder count for next control cycle
       velMotor[k] = velEncoder[k] / cCountsRev * 60;                     // calculate motor shaft velocity in rpm
-      //inData.speed = (int) (inData.speed/1600)*cMaxChange;                                                // lower speed because too big of jump
+      inData.speed = (int) (inData.speed/600)*cMaxChange;               // lower speed because too big of jump
       //update target for set direction
+
+      Serial.printf("\n %d \n",inData.speed);
 
       // for Fwd and rev ONLY
       posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
@@ -346,14 +343,14 @@ void loop() {
 #ifdef SERIAL_STUDIO
       
       if (k == 0) {
-        printf("/*");  // start of sequence for Serial Studio parsing
+      //  printf("/*");  // start of sequence for Serial Studio parsing
       }
-      printf("%d,%d,%d,%0.4f", target[k], pos[k], e[k], velMotor[k]);  // target, actual, error, velocity
+     // printf("%d,%d,%d,%0.4f", target[k], pos[k], e[k], velMotor[k]);  // target, actual, error, velocity
       if (k < cNumMotors - 1) {
-        printf(",");  // data separator for Serial Studio parsing
+      //  printf(",");  // data separator for Serial Studio parsing
       }
       if (k == cNumMotors - 1) {
-        printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle);  // end of sequence for Serial Studio parsing
+       // printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle);  // end of sequence for Serial Studio parsing
         driveData.data [0] = target[0];
         driveData.data [1] = pos[0];
         driveData.data [2] = e[0];
@@ -433,7 +430,7 @@ void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
   }
   memcpy(&inData, incomingData, sizeof(inData));  // store drive data from controller
 #ifdef PRINT_INCOMING
-  Serial.printf("%d, %d, %d, %d, %d, %d\n", inData.dir, inData.time, inData.speed, inData.turn, inData.dump);
+  Serial.printf("%d, %d, %d, %d, %d\n\n", inData.dir, inData.time, inData.speed, inData.turn, inData.dump);
 #endif
 }
 

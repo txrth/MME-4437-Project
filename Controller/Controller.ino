@@ -38,7 +38,6 @@ struct ControlDataPacket {
   int dir;  // drive direction: 1 = forward, -1 = reverse, 0 = stop
   int speed;
   int turn;
-  int conveyor;
   int dump;
   unsigned long time;  // time packet sent
 };
@@ -67,7 +66,7 @@ Button buttonRev = { 12, 0, 0, false, true, true };  // reverse, NO pushbutton o
 Button buttonL = { 13, 0, 0, false, true, true };    // L, NO pushbutton on GPIO 12, low state when pressed
 Button buttonR = { 14, 0, 0, false, true, true };    // reverse, NO pushbutton on GPIO 12, low state when pressed
 Button buttonDump = { 25, 0, 0, false, true, true };
-
+unsigned long lastActTime = 0;
 
 
 // REPLACE WITH MAC ADDRESS OF YOUR DRIVE ESP32
@@ -143,46 +142,51 @@ void loop() {
 
 
     if (!buttonL.state) {  // forward pushbutton pressed
-
       controlData.turn = -1;
     } else if (!buttonR.state) {  // reverse pushbutton pressed
       controlData.turn = 1;
-
     } else {
       controlData.turn = 0;
     }
 
     if (!buttonDump.state) {
-      controlData.dump = 1;
-    } else {
-      controlData.dump = 0;
-
-      // if drive appears disconnected, update control signal to stop before sending
-      if (commsLossCount > cMaxDroppedPackets) {
-        controlData.dir = 0;
-      }
-      controlData.speed = SPEED;
-      // send control signal to drive
-      result = esp_now_send(receiverMacAddress, (uint8_t *)&controlData, sizeof(controlData));
-      if (result == ESP_OK) {         // if sent successfully
-        digitalWrite(cStatusLED, 0);  // turn off communucation status LED
-      } else {                        // otherwise
-        digitalWrite(cStatusLED, 1);  // turn on communication status LED
+      Serial.print("\n\n press\n\n");
+      unsigned long curMillis = millis();
+      if ((curMillis - lastActTime) > cHeartbeatInterval) {
+        lastActTime=curMillis;
+        if (controlData.dump == 0) {
+          controlData.dump = 1;
+        } else {
+          controlData.dump = 0;
+        }
       }
     }
-#ifdef SERIAL_STUDIO
-    Serial.print("/*");
-    for (int i = 0; i < 15; i++) {
-      Serial.printf(" %d", inData.data[i]);
-      if (i != 14) {
-        Serial.printf(",");
-      }
+    // if drive appears disconnected, update control signal to stop before sending
+    if (commsLossCount > cMaxDroppedPackets) {
+      controlData.dir = 0;
     }
-    Serial.println("*/");
-#endif
-    doHeartbeat();  // update heartbeat LED
+    controlData.speed = SPEED;
+    // send control signal to drive
+    result = esp_now_send(receiverMacAddress, (uint8_t *)&controlData, sizeof(controlData));
+    if (result == ESP_OK) {         // if sent successfully
+      digitalWrite(cStatusLED, 0);  // turn off communucation status LED
+    } else {                        // otherwise
+      digitalWrite(cStatusLED, 1);  // turn on communication status LED
+    }
   }
+#ifdef SERIAL_STUDIO
+  Serial.print("/*");
+  for (int i = 0; i < 15; i++) {
+    Serial.printf(" %d", inData.data[i]);
+    if (i != 14) {
+      Serial.printf(",");
+    }
+  }
+  Serial.println("*/");
+#endif
+  doHeartbeat();  // update heartbeat LED
 }
+
 // blink heartbeat LED
 void doHeartbeat() {
   unsigned long curMillis = millis();  // get the current time in milliseconds
