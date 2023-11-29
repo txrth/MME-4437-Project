@@ -8,10 +8,10 @@
 //  Date:     2023 11 25
 //
 
-#define SERIAL_STUDIO  // print formatted string, that can be captured and parsed by Serial-Studio
+//#define SERIAL_STUDIO  // print formatted string, that can be captured and parsed by Serial-Studio
 //#define PRINT_SEND_STATUS  // uncomment to turn on output packet send status
-#define PRINT_INCOMING  // uncomment to turn on output of incoming data
-//#define PRINT_COLOUR  // uncomment to turn on output of colour sensor data
+//#define PRINT_INCOMING  // uncomment to turn on output of incoming data
+#define PRINT_COLOUR  // uncomment to turn on output of colour sensor data
 
 #include <Arduino.h>
 #include <esp_now.h>
@@ -198,7 +198,7 @@ void loop() {
   int pwm[] = { 0, 0, 0 };           // motor speed(s), represented in bit resolution
   int dir[] = { 1, 1, 1 };           // direction that motor should turn
   int speedV = 0;                    // var to hold speed value
-
+  unsigned long lastTimeAct;
 
   uint16_t r, g, b, cor;  // RGBC values from TCS34725
   double c;
@@ -214,9 +214,9 @@ void loop() {
 
 
   unsigned long curTime = micros();                  // capture current time in microseconds
-  if (curTime - lastTime > 10000) {                  // wait ~10 ms
-    deltaT = ((float)(curTime - lastTime)) / 1.0e6;  // compute actual time interval in seconds
-    lastTime = curTime;                              // update start time for next control cycle
+  if (curTime - lastTimeAct > 10000) {                  // wait ~10 ms
+    deltaT = ((float)(curTime - lastTimeAct)) / 1.0e6;  // compute actual time interval in seconds
+    lastTimeAct = curTime;                              // update start time for next control cycle
     driveData.time = curTime;                        // update transmission time
 
     uint16_t r, g, b, cor;               // RGBC values from TCS34725
@@ -225,7 +225,7 @@ void loop() {
       c = cor;
 #ifdef PRINT_COLOUR
 
-      Serial.printf("R: %f, G: %f, B: %f, C %f, A %d\n", r / c * 100, g / c * 100, b / c * 100, c, servo2Angle);
+      Serial.printf("R: %f, G: %f, B: %f, C %f, A %d\n", r / c * 100, g / c * 100, b / c * 100, c, servo1Angle);
 #endif
     }
   }
@@ -240,10 +240,10 @@ void loop() {
 
   if (inData.dump == 1) {
     //Serial.println("here");
-    servo2Angle = 130;
+    servo2Angle = 45;
   } else {
     //Serial.println("there");
-    servo2Angle = 10;
+    servo2Angle = 0;
   }
 
   ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
@@ -262,119 +262,119 @@ void loop() {
   interrupts();  // turn interrupts back on
 
   curTime = micros();
-  deltaT = ((float)(curTime - lastTime)) / 1.0e6;  // compute actual time interval in seconds
-  lastTime = curTime;                              // update start time for next control cycle
-  for (int k = 0; k < cNumMotors; k++) {
-    inData.speed = 50;
-    velEncoder[k] = ((float)pos[k] - (float)lastEncoder[k]) / deltaT;  // calculate velocity in counts/sec
-    lastEncoder[k] = pos[k];                                           // store encoder count for next control cycle
-    velMotor[k] = velEncoder[k] / cCountsRev * 60;                     // calculate motor shaft velocity in rpm
-    inData.speed = cMaxChange;
-    //update target for set direction
+  //if (curTime - lastTime > 10000) {                  // wait ~10 ms
+  if (true) {
+    deltaT = ((float)(curTime - lastTime)) / 1.0e6;  // compute actual time interval in seconds
+    lastTime = curTime;                              // update start time for next control cycle
+    driveData.time = curTime;                        // update transmission time
+
+    for (int k = 0; k < cNumMotors; k++) {
+      inData.speed = 50;
+      velEncoder[k] = ((float)pos[k] - (float)lastEncoder[k]) / deltaT;  // calculate velocity in counts/sec
+      lastEncoder[k] = pos[k];                                           // store encoder count for next control cycle
+      velMotor[k] = velEncoder[k] / cCountsRev * 60;                     // calculate motor shaft velocity in rpm
+      inData.speed = cMaxChange;
+      //update target for set direction
 
 
-    // for Fwd and rev ONLY
-    posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
+      // for Fwd and rev ONLY
+      posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
 
-    //for turning
-    if (inData.turn == 1 /*&& inData.dir != 0*/) {  //to turn left
-      posChange[0] = 0;                             // set pos change to 0 for L motor
-      posChange[1] = 1 * inData.speed;              // posChange[1] =  1 * inData.speed;
+      //for turning
+      if (inData.turn == 1 /*&& inData.dir != 0*/) {  //to turn left
+        posChange[0] = 0;                             // set pos change to 0 for L motor
+        posChange[1] = 1 * inData.speed;              // posChange[1] =  1 * inData.speed;
 
-    } else if (inData.turn == -1 /* && inData.dir != 0*/) {  //to turn right
-      posChange[1] = 0;                                      // set pos change to 0 for R motor
-      posChange[0] = 1 * inData.speed;
-    }
-    if (inData.dir == 0 && inData.turn != 0) {  // for turn in place
-      posChange[k] = (float)(inData.speed);     // set both to got forward
-      if (inData.turn == 1) {                   // to turn left
-        posChange[0] *= -1;                     // Left goes backwards
-
-      } else {               // else turning right
-        posChange[1] *= -1;  //right goes backwards
+      } else if (inData.turn == -1 /* && inData.dir != 0*/) {  //to turn right
+        posChange[1] = 0;                                      // set pos change to 0 for R motor
+        posChange[0] = 1 * inData.speed;
       }
-    }
+      if (inData.dir == 0 && inData.turn != 0) {  // for turn in place
+        posChange[k] = (float)(inData.speed);     // set both to got forward
+        if (inData.turn == 1) {                   // to turn left
+          posChange[0] *= -1;                     // Left goes backwards
 
-    posChange[2] = (float)(inData.speed);
+        } else {               // else turning right
+          posChange[1] *= -1;  //right goes backwards
+        }
+      }
 
-    // changes
-    targetF[k] = targetF[k] + posChange[k];  // set new target position
+      posChange[2] = 1600;
+
+      // changes
+      targetF[k] = targetF[k] + posChange[k];  // set new target position
 
 
-    if (k == 0) {                     // assume differential drive //apperently forword is rev
-      target[k] = (long)-targetF[k];  // motor 1 spins one way
-    } else if (k == 1) {
-      target[k] = (long)targetF[k];  // motor 2 spins in opposite direction
-    } else {
-      target[k] = (long)targetF[k];  //motor 3 spins too
-    }
+      if (k == 0) {                     // assume differential drive //apperently forword is rev
+        target[k] = (long)-targetF[k];  // motor 1 spins one way
+      } else if (k == 1) {
+        target[k] = (long)targetF[k];  // motor 2 spins in opposite direction
+      } else {
+        target[k] = (long)targetF[k];  //motor 3 spins too
+      }
 
-    // use PID to calculate control signal to motor
-    e[k] = target[k] - pos[k];                            // position error
-    dedt[k] = ((float)e[k] - ePrev[k]) / deltaT;          // derivative of error
-    eIntegral[k] = eIntegral[k] + e[k] * deltaT;          // integral of error (finite difference)
-    u[k] = kp * e[k] + kd * dedt[k] + ki * eIntegral[k];  // compute PID-based control signal
-    ePrev[k] = e[k];                                      // store error for next control cycle
+      // use PID to calculate control signal to motor
+      e[k] = target[k] - pos[k];                            // position error
+      dedt[k] = ((float)e[k] - ePrev[k]) / deltaT;          // derivative of error
+      eIntegral[k] = eIntegral[k] + e[k] * deltaT;          // integral of error (finite difference)
+      u[k] = kp * e[k] + kd * dedt[k] + ki * eIntegral[k];  // compute PID-based control signal
+      ePrev[k] = e[k];                                      // store error for next control cycle
 
-    // set direction based on computed control signal
-    dir[k] = 1;      // default to forward directon
-    if (u[k] < 0) {  // if control signal is negative
-      dir[k] = -1;   // set direction to reverse
-    }
+      // set direction based on computed control signal
+      dir[k] = 1;      // default to forward directon
+      if (u[k] < 0) {  // if control signal is negative
+        dir[k] = -1;   // set direction to reverse
+      }
 
-    // set speed based on computed control signal
-    u[k] = fabs(u[k]);               // get magnitude of control signal
-    if (u[k] > cMaxSpeedInCounts) {  // if control signal will saturate motor
-      u[k] = cMaxSpeedInCounts;      // impose upper limit
-    }
-    //[k] = cMaxSpeedInCounts;                                     // impose upper limit
-    pwm[k] = map(u[k], 0, cMaxSpeedInCounts, cMinPWM, cMaxPWM);  // convert control signal to pwm
-    if (commsLossCount < cMaxDroppedPackets / 4) {
-      setMotor(dir[k], pwm[k], cIN1Chan[k], cIN2Chan[k]);  // update motor speed and direction
-    } else {
-      setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);  // stop motor
-    }
+      // set speed based on computed control signal
+      u[k] = fabs(u[k]);               // get magnitude of control signal
+      if (u[k] > cMaxSpeedInCounts) {  // if control signal will saturate motor
+        u[k] = cMaxSpeedInCounts;      // impose upper limit
+      }
+      //[k] = cMaxSpeedInCounts;                                     // impose upper limit
+      pwm[k] = map(u[k], 0, cMaxSpeedInCounts, cMinPWM, cMaxPWM);  // convert control signal to pwm
+      if (commsLossCount < cMaxDroppedPackets / 4) {
+        setMotor(dir[k], pwm[k], cIN1Chan[k], cIN2Chan[k]);  // update motor speed and direction
+      } else {
+        setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);  // stop motor
+      }
 #ifdef SERIAL_STUDIO
 
-    if (k == 0) {
-      printf("/*");  // start of sequence for Serial Studio parsing
-    }
-    printf("%d,%d,%d,%0.4f", target[k], pos[k], e[k], velMotor[k]);  // target, actual, error, velocity
-    if (k < cNumMotors - 1) {
-      printf(",");  // data separator for Serial Studio parsing
-    }
-    if (k == cNumMotors - 1) {
-      printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle);  // end of sequence for Serial Studio parsing
-      driveData.data[0] = target[0];
-      driveData.data[1] = pos[0];
-      driveData.data[2] = e[0];
-      driveData.data[3] = (int)velMotor[1];
-      driveData.data[4] = target[1];
-      driveData.data[5] = pos[1];
-      driveData.data[6] = e[1];
-      driveData.data[7] = (int)velMotor[1];
-      driveData.data[8] = target[2];
-      driveData.data[9] = pos[2];
-      driveData.data[10] = e[2];
-      driveData.data[11] = (int)velMotor[2];
-      driveData.data[12] = servo1Angle;
-      driveData.data[13] = servo2Angle;
-      // driveData.data [14] = servo3Angle;
-    }
+      if (k == 0) {
+        printf("/*");  // start of sequence for Serial Studio parsing
+      }
+      printf("%d,%d,%d,%0.4f", target[k], pos[k], e[k], velMotor[k]);  // target, actual, error, velocity
+      if (k < cNumMotors - 1) {
+        printf(",");  // data separator for Serial Studio parsing
+      }
+      if (k == cNumMotors - 1) {
+        printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle);  // end of sequence for Serial Studio parsing
+        driveData.data[0] = target[0];
+        driveData.data[1] = pos[0];
+        driveData.data[2] = e[0];
+        driveData.data[3] = (int)velMotor[1];
+        driveData.data[4] = target[1];
+        driveData.data[5] = pos[1];
+        driveData.data[6] = e[1];
+        driveData.data[7] = (int)velMotor[1];
+        driveData.data[8] = target[2];
+        driveData.data[9] = pos[2];
+        driveData.data[10] = e[2];
+        driveData.data[11] = (int)velMotor[2];
+        driveData.data[12] = servo1Angle;
+        driveData.data[13] = servo2Angle;
+        // driveData.data [14] = servo3Angle;
+      }
 #endif
+    }
+    // send data from drive to controller
+    esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t *)&driveData, sizeof(driveData));
+    if (result == ESP_OK) {         // if sent successfully
+      digitalWrite(cStatusLED, 0);  // turn off communucation status LED
+    } else {                        // otherwise
+      digitalWrite(cStatusLED, 1);  // turn on communication status LED
+    }
   }
-  // send data from drive to controller
-  esp_err_t result = esp_now_send(receiverMacAddress, (uint8_t *)&driveData, sizeof(driveData));
-  if (result == ESP_OK) {         // if sent successfully
-    digitalWrite(cStatusLED, 0);  // turn off communucation status LED
-  } else {                        // otherwise
-    digitalWrite(cStatusLED, 1);  // turn on communication status LED
-  }
-
-
-
-  //ledcWrite(servo2Channel, degreesToDutyCycle(servo2Angle));
-  //ledcWrite(servo3Channel, degreesToDutyCycle(servo3Angle));
   doHeartbeat();  // update heartbeat LED
 }
 
