@@ -66,9 +66,9 @@ const int cCountsRev = 1096;              // encoder pulses per motor revolution
 const int cMaxSpeedInCounts = 2500;       // maximum encoder counts/sec
 const int cMaxChange = 14;                // maximum increment in counts/cycle
 const int cMaxDroppedPackets = 20;        // maximum number of packets allowed to drop
-const float kp = 1; //1.5                    // proportional gain for PID
-const float ki = .4; //.2                     // integral gain for PID
-const float kd = .3; //.3                    // derivative gain for PID
+const float kp = 3; //1.5                    // proportional gain for PID
+const float ki = 0; //.2                     // integral gain for PID
+const float kd = 0; //.3                    // derivative gain for PID
 const int cTCSLED = 23;                   // GPIO pin for LED on TCS34725
 const int servo1Pin = 14;                 // GPIO pin for servo1
 const int servo1Channel = 6;              //
@@ -211,8 +211,8 @@ void loop() {
 
   // if too many sequential packets have dropped, assume loss of controller, restart as safety measure
   if (commsLossCount > cMaxDroppedPackets) {
-    //delay(1000);    // okay to block here as nothing else should be happening
-    // ESP.restart();  // restart ESP32
+    delay(1000);    // okay to block here as nothing else should be happening
+     ESP.restart();  // restart ESP32
   }
 
 
@@ -265,8 +265,7 @@ void loop() {
   }
   interrupts();                        // turn interrupts back on
 
-  curTime = micros();
-  //if (curTime - lastTime > 10000) {                  // wait ~10 ms
+  curTime = micros();               
     deltaT = ((float)(curTime - lastTime)) / 1.0e6;  // compute actual time interval in seconds
     lastTime = curTime;                              // update start time for next control cycle
     for (int k = 0; k < cNumMotors; k++) {
@@ -274,10 +273,9 @@ void loop() {
       velEncoder[k] = ((float)pos[k] - (float)lastEncoder[k]) / deltaT;  // calculate velocity in counts/sec
       lastEncoder[k] = pos[k];                                           // store encoder count for next control cycle
       velMotor[k] = velEncoder[k] / cCountsRev * 60;                     // calculate motor shaft velocity in rpm
-      inData.speed = (int) (inData.speed/600)*cMaxChange;               // lower speed because too big of jump
+      inData.speed = cMaxChange;            
       //update target for set direction
 
-      Serial.printf("\n %d \n",inData.speed);
 
       // for Fwd and rev ONLY
       posChange[k] = (float)(inData.dir * inData.speed);  // update with pot input speed
@@ -343,14 +341,14 @@ void loop() {
 #ifdef SERIAL_STUDIO
       
       if (k == 0) {
-      //  printf("/*");  // start of sequence for Serial Studio parsing
+        printf("/*");  // start of sequence for Serial Studio parsing
       }
-     // printf("%d,%d,%d,%0.4f", target[k], pos[k], e[k], velMotor[k]);  // target, actual, error, velocity
+      printf("%d,%d,%d,%0.4f", target[k], pos[k], e[k], velMotor[k]);  // target, actual, error, velocity
       if (k < cNumMotors - 1) {
-      //  printf(",");  // data separator for Serial Studio parsing
+        printf(",");  // data separator for Serial Studio parsing
       }
       if (k == cNumMotors - 1) {
-       // printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle);  // end of sequence for Serial Studio parsing
+        printf(" ,%d,%d,%d*/\r\n", servo1Angle, servo2Angle);  // end of sequence for Serial Studio parsing
         driveData.data [0] = target[0];
         driveData.data [1] = pos[0];
         driveData.data [2] = e[0];
