@@ -22,7 +22,7 @@ void doHeartbeat();
 
 // Constants
 const int cHeartbeatLED = 2;          // GPIO pin of built-in LED for heartbeat
-const int cHeartbeatInterval = 1000;  // heartbeat blink interval, in milliseconds
+const int cHeartbeatInterval = 200;  // heartbeat blink interval, in milliseconds
 const int cTCSLED = 23;               // GPIO pin for LED on TCS34725
 const int servoPin = 15;
 const int servoChannel = 5;
@@ -101,7 +101,7 @@ void loop() {
   //if ((curMillis - lastActTime) > actDelay) {
     lastActTime = curMillis;
     ledcWrite(servoChannel, degreesToDutyCycle(servoAngle));
-     Serial.println("done");
+    // Serial.println("done");
     //servoAngle = 90;
   //}
 
