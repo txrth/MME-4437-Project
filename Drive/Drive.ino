@@ -83,13 +83,13 @@ const int servo2Channel = 7;              //GPIO pin for servo2
         23,36,35
   */
 
-const int cali[3] = { 23, 36, 34 };  // r g b
-const double tol = 2;
+const int cali[3] = { 24, 36, 34 };  // r g b
+const double tol[] = {1.5,1,1};
 const int actDelay = 1000;
 
 
 // Variables
-int servo1Angle = 0;
+int servo1Angle = 10;
 int servo2Angle = 0;
 //int servo3Angle;
 //int servo4Angle;
@@ -233,7 +233,8 @@ void loop() {
       Serial.printf("Percent: R: %2f, G: %2f, B: %2f, C %2f, A %d\n", r / c * 100, g / c * 100, b / c * 100, c, servo1Angle);
 #endif
       sampled = true;                                                                                                                                                                                                 // object detected
-      if (r / c * 100 >= cali[0] - tol && r / c * 100 <= cali[0] + tol && g / c * 100 >= cali[1] - tol && g / c * 100 <= cali[1] + tol && b / c * 100 >= cali[2] - tol && b / c * 100 <= cali[2] + tol && c < 200) {  // object is green gem
+      if (r / c * 100 >= cali[0] - tol[0] && r / c * 100 <= cali[0] + tol[0] && g / c * 100 >= cali[1] - tol[1] && g / c * 100 <= cali[1] + tol[1] && 
+      b / c * 100 >= cali[2] - tol[2] && b / c * 100 <= cali[2] + tol[2] && c < 200) {  // object is green gem
         servo1Angle = 55;
         Serial.println("Accepted");
         ledcWrite(servo1Channel, degreesToDutyCycle(servo1Angle));  // open
